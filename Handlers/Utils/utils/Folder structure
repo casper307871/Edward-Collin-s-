@@ -1,0 +1,23 @@
+EdwardAdminBot/
+│
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── config.py
+├── bot.py
+├── data.json
+├── event_logs.txt
+├── utils/
+│   ├── __init__.py
+│   ├── db_utils.py
+│   ├── logger.py
+│   ├── protection.py
+│   ├── enforcement.py
+│   ├── founders.py
+│   └── rescue.py
+└── handlers/
+    ├── __init__.py
+    ├── general.py
+    ├── founder_commands.py
+    ├── bans.py
+    └── messages.py
