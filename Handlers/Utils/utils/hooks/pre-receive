@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# hooks/pre-receive
+# very small example: reject if commit not signed or if ssh key not in allowlist
+set -e
+
+# Path to allowlist of authorized SSH key fingerprints or usernames
+ALLOWLIST="/etc/git/edward_allowlist.txt"
+REJECT_MSG="Push rejected: unauthorized key or unsigned commits."
+
+while read oldrev newrev refname; do
+  # check commits for signature (GPG) - requires 'git verify-commit' availability and signed commits upstream
+  for commit in $(git rev-list "$oldrev..$newrev"); do
+    if ! git verify-commit "$commit" >/dev/null 2>&1; then
+      echo "$REJECT_MSG (unsigned commit $commit)" >&2
+      exit 1
+    fi
+  done
+done
+
+# Optional: verify SSH key fingerprint of the incoming connection (depends on server: GIT_SSH_COMMAND must set env)
+# Example: check $SSH_CONNECTION or $USER, or better use forced commands and per-key authorized_keys
+# We'll just allow push to continue if signed commits verified
+exit 0
