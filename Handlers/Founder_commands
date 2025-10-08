@@ -1,0 +1,82 @@
+from telegram.ext import CommandHandler, ContextTypes
+from telegram import Update
+from functools import wraps
+from utils.db_utils import load_db, save_db, is_founder, PERMANENT_FOUNDERS
+from utils.logger import log_action
+
+def founder_required(func):
+    @wraps(func)
+    async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        user = update.effective_user
+        if not user or not is_founder(user.id, PERMANENT_FOUNDERS):
+            if update.message:
+                await update.message.reply_text("⛔ You must be a founder to use this command.")
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapped
+
+@founder_required
+async def addfounder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = load_db()
+    if not context.args:
+        await update.message.reply_text("Usage: /addfounder <user_id>")
+        return
+    try:
+        uid = int(context.args[0])
+    except:
+        await update.message.reply_text("Invalid user id.")
+        return
+    if uid in PERMANENT_FOUNDERS:
+        await update.message.reply_text("User is already a permanent founder.")
+        return
+    dyn = set(db.get("founders_dynamic", []))
+    dyn.add(uid)
+    db["founders_dynamic"] = list(dyn)
+    save_db(db)
+    log_action(uid, "Added as founder", update.effective_user.id)
+    await update.message.reply_text(f"✅ Added founder: {uid}")
+
+@founder_required
+async def removefounder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = load_db()
+    if not context.args:
+        await update.message.reply_text("Usage: /removefounder <user_id>")
+        return
+    try:
+        uid = int(context.args[0])
+    except:
+        await update.message.reply_text("Invalid user id.")
+        return
+    if uid in PERMANENT_FOUNDERS:
+        await update.message.reply_text("⛔ Cannot remove a permanent founder.")
+        return
+    dyn = set(db.get("founders_dynamic", []))
+    if uid in dyn:
+        dyn.remove(uid)
+        db["founders_dynamic"] = list(dyn)
+        save_db(db)
+        log_action(uid, "Removed as founder", update.effective_user.id)
+        await update.message.reply_text(f"✅ Removed founder: {uid}")
+    else:
+        await update.message.reply_text("User is not a dynamic founder.")
+
+@founder_required
+async def founders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = load_db()
+    dynamic = db.get("founders_dynamic", [])
+    flist = sorted(list(PERMANENT_FOUNDERS) + dynamic)
+    await update.message.reply_text("Founders: " + ", ".join(str(x) for x in flist))
+
+@founder_required
+async def secure(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db = load_db()
+    if not context.args:
+        await update.message.reply_text("Usage: /secure on|off")
+        return
+    mode = context.args[0].lower()
+    if mode not in ("on", "off"):
+        await update.message.reply_text("Usage: /secure on|off")
+        return
+    db["secure_mode"] = mode == "on"
+    save_db(db)
+    await update.message.reply_text(f"Secure mode set to: {db['secure_mode']}")
