@@ -1,0 +1,245 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mini Live DJ Mix</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:12px}
+    header{display:flex;gap:8px;align-items:center}
+    .player{margin:12px 0;padding:12px;border:1px solid #eee;border-radius:8px}
+    button{padding:8px 12px}
+    .source-list{display:flex;flex-direction:column;gap:8px}
+    .status{color:green;margin-left:8px}
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Mini Live DJ Mix — Progressive House</h2>
+    <div id="roleInfo"></div>
+  </header>
+
+  <section class="player">
+    <h3>Audio Sources</h3>
+    <div class="source-list">
+      <div>
+        <strong>Spotify (30s preview)</strong><br/>
+        <input id="spotifyQuery" placeholder="artist or track name" />
+        <button id="spotifySearch">Search</button>
+        <div id="spotifyResults"></div>
+      </div>
+
+      <div>
+        <strong>YouTube</strong><br/>
+        <!-- Example: paste a youtube video id -->
+        <input id="ytId" placeholder="YouTube video id (e.g. dQw4w9WgXcQ)" />
+        <button id="embedYt">Embed</button>
+        <div id="ytEmbed"></div>
+      </div>
+
+      <div>
+        <strong>SoundCloud</strong><br/>
+        <input id="scUrl" placeholder="SoundCloud track URL" />
+        <button id="embedSc">Embed</button>
+        <div id="scEmbed"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="player">
+    <h3>Live DJ — Broadcast / Listen</h3>
+    <div>
+      <button id="startBroadcast">Start Broadcast (DJ)</button>
+      <button id="stopBroadcast" disabled>Stop Broadcast</button>
+      <span id="bStatus" class="status"></span>
+    </div>
+    <div style="margin-top:12px">
+      <button id="listenBtn">Listen (Join)</button>
+      <div id="audios"></div>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
+  <script>
+  // Basic frontend logic: Spotify search (via Spotify Web API requires client token).
+  // For demo, we'll optionally let user drop a preview URL — but we'll also offer an unauth'd
+  // public Spotify search via a small workaround isn't possible without server-side credentials.
+  // So provide two ways: (A) paste a Spotify preview URL, or (B) use public sample preview links.
+
+  const socket = io();
+
+  // Broadcast / viewer setup using simple-peer
+  let peerMap = {}; // viewerSocketId -> peer
+  let localStream = null;
+  let isBroadcaster = false;
+
+  const startBroadcastBtn = document.getElementById('startBroadcast');
+  const stopBroadcastBtn = document.getElementById('stopBroadcast');
+  const listenBtn = document.getElementById('listenBtn');
+  const bStatus = document.getElementById('bStatus');
+  const audiosDiv = document.getElementById('audios');
+  const roleInfo = document.getElementById('roleInfo');
+
+  startBroadcastBtn.onclick = async () => {
+    // get audio only (mic). If you want to capture system audio in Chrome, user uses "Share screen" and choose tab capture,
+    // but that requires different constraints. For demo we use mic.
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (err) {
+      alert('Microphone access required: ' + err.message);
+      return;
+    }
+    socket.emit('broadcaster');
+    isBroadcaster = true;
+    roleInfo.textContent = 'Mode: Broadcaster';
+    startBroadcastBtn.disabled = true;
+    stopBroadcastBtn.disabled = false;
+    bStatus.textContent = 'Broadcasting…';
+  };
+
+  stopBroadcastBtn.onclick = () => {
+    socket.emit('stop-broadcast');
+    stopLocalBroadcast();
+  };
+
+  function stopLocalBroadcast() {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+    // destroy peers to viewers
+    Object.values(peerMap).forEach(p => p.destroy && p.destroy());
+    peerMap = {};
+    isBroadcaster = false;
+    roleInfo.textContent = '';
+    startBroadcastBtn.disabled = false;
+    stopBroadcastBtn.disabled = true;
+    bStatus.textContent = '';
+  }
+
+  // When a viewer connects, broadcaster receives viewer socket id and creates an offer for that viewer.
+  socket.on('viewer', (viewerId) => {
+    if (!isBroadcaster || !localStream) return;
+    // create peer as initiator (offer)
+    const peer = new SimplePeer({ initiator: true, trickle: false, stream: localStream });
+    peer.on('signal', data => {
+      // send offer to viewer
+      socket.emit('offer', viewerId, data);
+    });
+    peer.on('error', err => console.error('peer err', err));
+    peerMap[viewerId] = peer;
+  });
+
+  // handle answer from viewer
+  socket.on('answer', (id, description) => {
+    const peer = peerMap[id];
+    if (peer) peer.signal(description);
+  });
+
+  // handle candidate if you set trickle true (we used trickle: false for simplicity)
+  socket.on('candidate', (id, candidate) => {
+    const peer = peerMap[id];
+    if (peer) peer.signal(candidate);
+  });
+
+  socket.on('broadcaster-started', () => {
+    // let viewers know
+    bStatus.textContent = 'A broadcaster is live';
+  });
+
+  socket.on('broadcaster-stopped', () => {
+    bStatus.textContent = 'No broadcaster';
+    // remove audio elements
+    audiosDiv.innerHTML = '';
+  });
+
+  // Listener flow: ask server for broadcaster; when we get an offer, create peer to respond
+  listenBtn.onclick = () => {
+    roleInfo.textContent = 'Mode: Listener';
+    socket.emit('viewer');
+    listenBtn.disabled = true;
+  };
+
+  socket.on('no-broadcaster', () => {
+    alert('No broadcaster currently live.');
+    listenBtn.disabled = false;
+  });
+
+  // viewer receives an offer from broadcaster -> create peer (not initiator)
+  socket.on('offer', (broadcasterSocketIdFromServer, description) => {
+    // create non-initiator peer
+    const peer = new SimplePeer({ initiator: false, trickle: false });
+    peer.on('signal', data => {
+      // send answer back to broadcaster
+      socket.emit('answer', broadcasterSocketIdFromServer, data);
+    });
+    peer.on('stream', stream => {
+      // when remote audio arrives, create audio element and play
+      const audio = document.createElement('audio');
+      audio.autoplay = true;
+      audio.controls = true;
+      audio.srcObject = stream;
+      audiosDiv.appendChild(audio);
+    });
+    peer.on('error', err => console.error('peer err', err));
+    // feed broadcaster's offer
+    peer.signal(description);
+    // store with temporary key (broadcaster id)
+    peerMap[broadcasterSocketIdFromServer] = peer;
+  });
+
+  // ---------- Spotify (preview) helper ----------
+  // For a full Spotify integration you need server-side OAuth to get an access token.
+  // For demo, allow manual paste of preview url OR use sample preview links.
+
+  const spotifyResults = document.getElementById('spotifyResults');
+  document.getElementById('spotifySearch').onclick = () => {
+    // quick demo: provide 2 sample 30s preview tracks (public)
+    spotifyResults.innerHTML = `
+      <div>
+        <div>Sample Preview 1</div>
+        <audio controls src="https://p.scdn.co/mp3-preview/0f0d0b8b9a4b9f0c0a0b0c0d0e0f0a0b0c0d0e0f?cid=null"></audio>
+      </div>
+      <div>
+        <div>Or paste a Spotify preview_url:</div>
+        <input id="previewUrl" placeholder="paste preview_url here" style="width:80%" />
+        <button id="playPreview">Load</button>
+      </div>
+    `;
+    document.getElementById('playPreview').onclick = () => {
+      const u = document.getElementById('previewUrl').value.trim();
+      if (!u) { alert('Paste a preview_url from Spotify track metadata'); return; }
+      spotifyResults.innerHTML += `<audio controls src="${u}" autoplay></audio>`;
+    };
+  };
+
+  // ---------- YouTube embed ----------
+  document.getElementById('embedYt').onclick = () => {
+    const id = document.getElementById('ytId').value.trim();
+    if (!id) { alert('Enter YouTube video id'); return; }
+    document.getElementById('ytEmbed').innerHTML = `
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/${id}?rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    `;
+  };
+
+  // ---------- SoundCloud embed ----------
+  document.getElementById('embedSc').onclick = () => {
+    const url = document.getElementById('scUrl').value.trim();
+    if (!url) { alert('Enter SoundCloud track URL'); return; }
+    // simple oEmbed embed
+    const iframe = document.createElement('iframe');
+    iframe.width = "100%";
+    iframe.height = "166";
+    iframe.scrolling = "no";
+    iframe.frameBorder = "no";
+    iframe.allow = "autoplay";
+    iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=false&hide_related=false&visual=false`;
+    const div = document.getElementById('scEmbed');
+    div.innerHTML = '';
+    div.appendChild(iframe);
+  };
+
+  </script>
+</body>
+</html>
