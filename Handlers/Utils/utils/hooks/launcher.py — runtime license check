@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+# launcher.py
+import json, subprocess, sys, os, hmac, hashlib, base64
+from datetime import datetime, timezone
+
+LICENSE_PATH = "license.json"
+PUBKEY_PATH = "license_pub.pem"  # if using RSA-signed JWT, implement verification properly
+
+def get_machine_fingerprint():
+    # Example on Linux: use /etc/machine-id; fallback to hostname
+    try:
+        with open('/etc/machine-id','r') as f:
+            v = f.read().strip()
+            return 'etc-machine-id:'+v
+    except:
+        return 'hostname:'+os.uname().nodename
+
+def verify_hmac(data_json, signature_b64, secret):
+    sig = base64.b64decode(signature_b64)
+    mac = hmac.new(secret.encode('utf-8'), data_json.encode('utf-8'), hashlib.sha256).digest()
+    return hmac.compare_digest(mac, sig)
+
+def main():
+    if not os.path.exists(LICENSE_PATH):
+        print("License file missing. Contact admin.")
+        sys.exit(1)
+
+    with open(LICENSE_PATH,'r') as f:
+        license_blob = json.load(f)
+
+    payload = license_blob.get('payload')
+    signature = license_blob.get('signature')
+    if not payload or not signature:
+        print("Malformed license.")
+        sys.exit(1)
+
+    # In real deployment, verify signature with server public key or HSM — here is an example HMAC check
+    server_shared_secret = os.environ.get('EDWARD_LICENSE_SECRET')
+    if not server_shared_secret:
+        print("Missing local license secret. Admin must configure server key.")
+        sys.exit(1)
+
+    payload_json = json.dumps(payload, separators=(',',':'))
+    if not verify_hmac(payload_json, signature, server_shared_secret):
+        print("License signature invalid.")
+        sys.exit(1)
+
+    # fingerprint match
+    fingerprint = get_machine_fingerprint()
+    if payload.get('fingerprint') and payload['fingerprint'] != fingerprint:
+        print("License fingerprint mismatch. Unauthorized machine.")
+        sys.exit(1)
+
+    expiry = payload.get('expiry')
+    if expiry and datetime.fromisoformat(expiry.replace('Z','+00:00')) < datetime.now(timezone.utc):
+        print("License expired.")
+        sys.exit(1)
+
+    print("License valid. Starting Edward.")
+    # exec the real app; replace with correct entry point
+    # os.execv('/usr/bin/python3', ['python3','-m','edward_main'])
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
