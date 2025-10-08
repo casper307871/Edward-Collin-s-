@@ -102,17 +102,6 @@ Command	Description
 
 
 
-⚡ Preloaded Enforced Groups
-
-Edward starts with the following enforced groups:
-
-• Admin | KickBot [-1001998128623]
-• 🪩 PNP PЯOMO 🪩 [-1001835706253]
-• The Pecker Press 🥳 [-1002140248076]
-• ParTy PnP 🥳 [-1002005264999]
-• TΞXΛS PNP [-1002029579486]
-...
-(Full list available in config.py -> INITIAL_ENFORCED_GROUPS)
 
 
 
