@@ -1,0 +1,33 @@
+from telebot import TeleBot
+
+bot = TeleBot("YOUR_BOT_TOKEN_HERE")
+
+# Beacon alert message
+ALERT_MESSAGE = """
+🚨🛑🦇 BAT SIGNAL ACTIVATED 🦇🛑🚨
+**Admins! Immediate attention required!**
+⚡⚡ HIGH-PRIORITY ALERT ⚡⚡
+"""
+
+@bot.message_handler(commands=['batsignal'])
+def bat_signal(message):
+    chat_id = message.chat.id
+
+    # Only allow admins to trigger
+    chat_admins = bot.get_chat_administrators(chat_id)
+    trigger_user = message.from_user.id
+    if trigger_user not in [admin.user.id for admin in chat_admins]:
+        bot.reply_to(message, "❌ Only admins can activate the Bat Signal!")
+        return
+
+    # Send group alert (Beacon)
+    bot.send_message(chat_id, ALERT_MESSAGE, parse_mode='Markdown')
+
+    # DM each admin individually
+    for admin in chat_admins:
+        try:
+            bot.send_message(admin.user.id, ALERT_MESSAGE, parse_mode='Markdown')
+        except Exception as e:
+            print(f"Cannot send DM to {admin.user.id}: {e}")
+
+bot.polling()
