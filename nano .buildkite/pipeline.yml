@@ -1,0 +1,10 @@
+steps:
+  - label: ":robot: Run EdwardAdminBot"
+    commands:
+      - echo "--- Installing dependencies"
+      - pip install -r requirements.txt
+      - echo "--- Running the bot"
+      - python bot.py
+    artifact_paths:
+      - event_logs.txt
+    timeout_in_minutes: 10
