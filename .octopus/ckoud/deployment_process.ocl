@@ -6,6 +6,8 @@ step "run-an-aws-cli-script" {
         action_type = "Octopus.AwsRunScript"
         is_required = true
         properties = {
+            Octopus.Action.AutoRetry.MaximumCount = "3"
+            Octopus.Action.AutoRetry.MinimumBackoff = "10"
             Octopus.Action.Aws.AssumeRole = "False"
             Octopus.Action.Aws.Region = "us-east "
             Octopus.Action.AwsAccount.UseInstanceRole = "True"
