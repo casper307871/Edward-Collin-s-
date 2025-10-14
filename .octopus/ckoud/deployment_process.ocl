@@ -41,7 +41,7 @@ step "deploy-a-release" {
         properties = {
             Octopus.Action.DeployRelease.DeploymentCondition = "Always"
             Octopus.Action.DeployRelease.ProjectId = "bro"
-            Octopus.Action.DeployRelease.Variables = "{\"bot_token\":\"8260029074:AAE37-FrmOnAVtt1VERqrE0ok-KDyYSnA9Q\",\"api_id\":\"27910917\",\"api\":\"\",\"\":\"\"}"
+            Octopus.Action.DeployRelease.Variables = "{\"bot_token\":\"8260029074:AAE37-FrmOnAVtt1VERqrE0ok-KDyYSnA9Q\",\"api_id\":\"27910917\",\"api_hash\":\"abc1cbd2604866ca554e0e794785a14zzzz\",\"\":\"\"}"
             Octopus.Action.RunOnServer = "false"
         }
     }
