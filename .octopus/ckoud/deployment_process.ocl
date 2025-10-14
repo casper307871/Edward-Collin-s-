@@ -13,3 +13,21 @@ step "run-an-aws-cli-script" {
         worker_pool = "hosted-windows"
     }
 }
+
+step "health-check" {
+    name = "Health Check"
+    properties = {
+        Octopus.Action.MaxParallelism = "1"
+        Octopus.Action.TargetRoles = "offlice,ecs cluster,service,sample-app-server"
+    }
+
+    action {
+        action_type = "Octopus.HealthCheck"
+        is_required = true
+        properties = {
+            Octopus.Action.HealthCheck.ErrorHandling = "TreatExceptionsAsErrors"
+            Octopus.Action.HealthCheck.IncludeMachinesInDeployment = "IncludeCheckedMachines"
+            Octopus.Action.HealthCheck.Type = "FullHealthCheck"
+        }
+    }
+}
