@@ -3,40 +3,13 @@ step "run-an-aws-cli-script" {
     name = "Run an AWS CLI Script"
 
     action {
-        action_type = "Octopus.AwsRunScript"
         is_required = true
         properties = {
             Octopus.Action.AutoRetry.MaximumCount = "3"
             Octopus.Action.AutoRetry.MinimumBackoff = "10"
-            Octopus.Action.Aws.AssumeRole = "False"
-            Octopus.Action.Aws.Region = "us-east "
-            Octopus.Action.AwsAccount.UseInstanceRole = "True"
-            Octopus.Action.EnabledFeatures = "Octopus.Features.JsonConfigurationVariables,Octopus.Features.SubstituteInFiles,Octopus.Features.SelectPowerShellEditionForWindows"
-            Octopus.Action.GitRepository.Source = "Project"
-            Octopus.Action.PowerShell.Edition = "Core"
-            Octopus.Action.Script.ScriptFileName = "]https://github.com/casper307871/bro"
-            Octopus.Action.Script.ScriptParameters = <<-EOT
-                yaml
-                db
-                py
-                md
-                nobe
-                
-                EOT
-            Octopus.Action.Script.ScriptSource = "GitRepository"
-            Octopus.Action.SubstituteInFiles.OutputEncoding = "yaml"
-            OctopusUseBundledTooling = "False"
+            Octopus.Action.Template.Id = "ActionTemplates-22"
+            Octopus.Action.Template.Version = "0"
         }
         worker_pool = "hosted-windows"
-
-        packages "sample-package" {
-            acquisition_location = "Server"
-            feed = "octopus-server-built-in"
-            package_id = "sample-package"
-            properties = {
-                Extract = "True"
-                SelectionMode = "immediate"
-            }
-        }
     }
 }
