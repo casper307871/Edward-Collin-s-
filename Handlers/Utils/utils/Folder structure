@@ -1,1 +1,21 @@
-
+EdwardAdminBot/
+├── LICENSE                    # Open-source license (optional)
+├── README.md                  # Info/instructions for the bot
+├── requirements.txt            # List of Python dependencies
+├── config.py                   # Stores config vars (e.g., bot token, admins)
+├── bot.py                      # Main Telegram bot logic (entry point)
+├── data.json                   # Stores runtime or saved bot data
+├── event_logs.txt              # Log file for events (like user joins, bans, etc.)
+├── start.sh                    # Bash script to start the bot (for Octopus/GitHub)
+├── telegrambot.service         # Optional systemd service config for auto-run
+│
+├── utils/                      # Utility modules
+│   ├── __init__.py
+│   ├── db_utils.py             # Database handling helpers
+│   ├── enforcement.py          # Ban/mute/enforcement tools
+│   ├── founders.py             # Founder/admin command logic
+│   └── rescue.py               # Restore/reset utilities
+│
+└── handlers/                   # Telegram command/event handlers
+    ├── __init__.py
+    ├── general.py              # General user commands (start/help/etc.)
